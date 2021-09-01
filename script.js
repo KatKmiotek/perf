@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
+import { randomSeed } from 'k6';
 
 
 // export let options = {
@@ -10,9 +11,15 @@ import { check, sleep } from 'k6';
 //   ],
 // };
 
- 
+
 const accessToken = __ENV.GITHUB_TOKEN;
 const issueID = "MDU6SXNzdWU5ODM1MTQ0MDg=";
+
+randomSeed(5)
+let randomNum = Math.random();
+
+const commText = "comment " + randomNum
+
 
 const query = `
 {
@@ -29,37 +36,40 @@ const query = `
     }
   }`;
 
-  const mutation = `
-  mutation MyMutation {
-    gitHub {
-      addComment(input: { subjectId: "${issueID}", body: "hello" }){
-        subject{
+const mutation = `
+      mutation add {
+      addComment(input:{subjectId:"${issueID}",body:"${commText}"}) {
+        subject {
           id
         }
       }
-    }
-  }
+}
   
   
   `;
 
 const headers = {
-  Authorization: `Bearer ${accessToken}`,
-  'Content-Type': 'application/json',
+    Authorization: `Bearer ${accessToken}`,
+    'Content-Type': 'application/json',
 };
 
 
 export default function () {
     const res = http.post('https://api.github.com/graphql', JSON.stringify({ query: query }), { headers: headers });
     const comments = JSON.parse(res.body).data.repository.issue.comments.edges;
-    check(res, 
+    check(res,
         {
-        "status is 200": () => res.status === 200,
-        "has correct comment 1": () => comments[0].node.bodyText === "lets see",
-        "has correct comment 2": () => comments[1].node.bodyText === "another one",
-        "has correct comment 3": () => comments[2].node.bodyText === "3rd one",
-    });
+            "status is 200": () => res.status === 200,
+            "has correct comment 1": () => comments[0].node.bodyText === "lets see",
+            "has correct comment 2": () => comments[1].node.bodyText === "another one",
+            "has correct comment 3": () => comments[2].node.bodyText === "3rd one",
+        });
 
     const resMut = http.post('https://api.github.com/graphql', JSON.stringify({ query: mutation }), { headers: headers })
     console.log('response mutation', JSON.stringify(resMut.body));
+    check(resMut,
+        {
+            "status is 200 after adding comment": () => resMut.status === 200,
+            "mutation response contains subject id": () => JSON.parse(resMut.body).data.addComment.subject.id === issueID,
+        });
 }
