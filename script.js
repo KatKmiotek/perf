@@ -22,7 +22,7 @@ const commText = "comment " + randomNum
 
 const query = `
 {
-      repository(name: "perf", owner: "KatKmiotek") {
+      repository(name: "perf_graphql_k6", owner: "KatKmiotek") {
         issue(number: 1) {
           comments(first: 10) {
             edges {
@@ -67,7 +67,7 @@ const headers = {
 export default function () {
 
     // QUERY GET
-    
+
     const res = http.post('https://api.github.com/graphql', JSON.stringify({ query: query }), { headers: headers });
     const comments = JSON.parse(res.body).data.repository.issue.comments.edges;
     let commentID = JSON.parse(res.body).data.repository.issue.comments.edges[7].node.id
@@ -83,7 +83,7 @@ export default function () {
     // MUTATION ADD
 
     const resMut = http.post('https://api.github.com/graphql', JSON.stringify({ query: mutation }), { headers: headers })
-    console.log('response mutation', JSON.stringify(resMut.body));
+    // console.log('response mutation', JSON.stringify(resMut.body));
     check(resMut,
         {
             "status code after adding a new comment is": () => resMut.status === 200,
