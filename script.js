@@ -15,7 +15,6 @@ import { randomSeed } from 'k6';
 const accessToken = __ENV.GITHUB_TOKEN;
 const issueID = "MDU6SXNzdWU5ODM1MTQ0MDg=";
 
-randomSeed(5)
 let randomNum = Math.random();
 
 const commText = "comment " + randomNum
@@ -29,6 +28,7 @@ const query = `
             edges {
               node {
                 bodyText
+                id
               }
             }
           }
@@ -43,10 +43,20 @@ const mutation = `
           id
         }
       }
-}
-  
-  
+} 
   `;
+
+const deleteMut = `
+mutation delete($id: ID!) {
+      deleteIssueComment(
+        input: {
+          id: $id
+        }
+      ) {
+         clientMutationId
+      }
+    }
+`;
 
 const headers = {
     Authorization: `Bearer ${accessToken}`,
@@ -55,8 +65,12 @@ const headers = {
 
 
 export default function () {
+
+    // QUERY GET
+    
     const res = http.post('https://api.github.com/graphql', JSON.stringify({ query: query }), { headers: headers });
     const comments = JSON.parse(res.body).data.repository.issue.comments.edges;
+    let commentID = JSON.parse(res.body).data.repository.issue.comments.edges[7].node.id
     check(res,
         {
             "status is 200": () => res.status === 200,
@@ -65,11 +79,27 @@ export default function () {
             "has correct comment 3": () => comments[2].node.bodyText === "3rd one",
         });
 
+
+    // MUTATION ADD
+
     const resMut = http.post('https://api.github.com/graphql', JSON.stringify({ query: mutation }), { headers: headers })
     console.log('response mutation', JSON.stringify(resMut.body));
     check(resMut,
         {
-            "status is 200 after adding comment": () => resMut.status === 200,
+            "status code after adding a new comment is": () => resMut.status === 200,
             "mutation response contains subject id": () => JSON.parse(resMut.body).data.addComment.subject.id === issueID,
         });
+
+
+
+    // MUTATION DELETE
+
+    const resDel = http.post('https://api.github.com/graphql', JSON.stringify({ query: deleteMut, variables: { id: commentID } }), { headers: headers })
+    console.log('comment id', commentID);
+    check( resDel,
+        {
+            "status code after deleting comment is 200" : () => resDel.status === 200,
+        }
+
+    )
 }
